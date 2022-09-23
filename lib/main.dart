@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:mr_plus/splash.dart';
 import 'package:sizer/sizer.dart';
 
+import 'home.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -29,7 +31,7 @@ class MyApp extends StatelessWidget {
             // is not restarted.
             primarySwatch: Colors.blue,
           ),
-          home: const SplashS(),
+          home: const SplashS(), //const home(),
         );
       },
     );
