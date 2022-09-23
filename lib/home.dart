@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:sizer/sizer.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:http/http.dart';
+import 'package:http/http.dart' as http;
+import 'package:path/path.dart';
+import 'package:http_parser/http_parser.dart';
+import 'dart:convert';
 
 class home extends StatefulWidget {
   const home({Key? key}) : super(key: key);
@@ -13,7 +18,19 @@ class home extends StatefulWidget {
 }
 
 class _homeState extends State<home> {
+  // Controllers
+
+  final TextEditingController _controller = new TextEditingController();
+  final TextEditingController _file_controller = new TextEditingController();
+  final TextEditingController _result_controller = new TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   Future getPdfAndUpload() async {
+    setState(() {});
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       dialogTitle: 'Please select an X-ray image:',
       type: FileType.custom,
@@ -25,6 +42,57 @@ class _homeState extends State<home> {
     String file_path = filepath.toString();
 
     print(file_path);
+
+    File file = File(file_path);
+    Uri url = Uri.parse("http://192.168.10.10:8000/list");
+
+    var bytes = file.readAsBytesSync();
+
+    setState(() {
+      _controller.text;
+      file_path;
+    });
+    var request = http.MultipartRequest('POST', url)
+      ..fields['filename'] = _controller.text
+      ..files.add(await http.MultipartFile.fromPath("docfile", file_path,
+          contentType: MediaType('application', 'x-tar')));
+    var response = await request.send();
+    print(response);
+    if (response.statusCode == 200) print('Uploaded!');
+
+    String _basename = file_path.split("/").last;
+
+    _file_controller.text = file_path;
+    setState(() {
+      _controller.text = _basename;
+    });
+
+    //_result_controller.text = "no results";
+    this.setState(() {});
+  }
+
+  Future makePostRequest() async {
+    this.setState(() {});
+
+    final uri = Uri.parse('http://192.168.10.10:8000/status');
+    final headers = {'Content-Type': 'application/json'};
+    Map<String, String> body = {'file': _controller.text};
+    String jsonBody = json.encode(body);
+    final encoding = Encoding.getByName('utf-8');
+
+    Response response = await post(
+      uri,
+      headers: headers,
+      body: jsonBody,
+      encoding: encoding,
+    );
+
+    int statusCode = response.statusCode;
+    String responseBody = response.body;
+    var data = json.decode(responseBody);
+    print(data['status']);
+    _result_controller.text = data['status'];
+    setState(() {});
   }
 
   File? imageFile;
@@ -35,8 +103,29 @@ class _homeState extends State<home> {
       maxHeight: 1800,
     );
     if (pickedFile != null) {
-      setState(() {
-        imageFile = File(pickedFile.path);
+      String file_path = pickedFile.path;
+
+      File file = File(file_path);
+      Uri url = Uri.parse("http://192.168.10.10:8000/list");
+
+      var bytes = file.readAsBytesSync();
+
+      var request = http.MultipartRequest('POST', url)
+        ..fields['filename'] = _controller.text
+        ..files.add(await http.MultipartFile.fromPath("docfile", file_path,
+            contentType: MediaType('application', 'x-tar')));
+      var response = await request.send();
+      print(response);
+      if (response.statusCode == 200) print('Uploaded!');
+
+      _file_controller.text = file_path;
+      String _basename = _file_controller.text.split("/").last;
+      _controller.text = _basename;
+      //_result_controller.text = "no results";
+      this.setState(() {});
+
+      this.setState(() {
+        _controller.text;
       });
     }
   }
@@ -102,16 +191,42 @@ class _homeState extends State<home> {
               ],
             ),
             SizedBox(height: 30),
+            if (_file_controller.text == "") ...[
+              Center(
+                child: Image(
+                  image: AssetImage("images/hp.png"),
+                  width: 55.0.w,
+                ),
+              ),
+            ] else ...[
+              Container(
+                height: 40.h,
+                width: 100.0.w,
+                decoration: BoxDecoration(
+                    color: Colors.white,
+                    border: Border.all(width: 2, color: Color(0xFFf4aacb)),
+                    borderRadius: BorderRadius.all(Radius.circular(10)),
+                    image: DecorationImage(
+                        image: FileImage(File(_file_controller.text)),
+                        fit: BoxFit.cover)),
+              ),
+            ],
+
+            // show result from server
+            SizedBox(height: 20),
             Center(
-              child: Image(
-                image: AssetImage("images/hp.png"),
-                width: 55.0.w,
+              child: Text(
+                _result_controller.text,
+                style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15),
               ),
             ),
-            SizedBox(height: 50),
+            SizedBox(height: 20),
             GestureDetector(
               onTap: () {
-                _getFromGallery();
+                getPdfAndUpload();
               },
               child: Container(
                 decoration: BoxDecoration(
@@ -150,7 +265,9 @@ class _homeState extends State<home> {
             ),
             Expanded(child: SizedBox()),
             GestureDetector(
-              onTap: () {},
+              onTap: () {
+                makePostRequest();
+              },
               child: Container(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.all(Radius.circular(50)),
